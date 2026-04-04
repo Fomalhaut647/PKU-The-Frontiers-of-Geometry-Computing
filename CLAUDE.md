@@ -19,7 +19,7 @@ pixi add --pypi trimesh                     # PyPI 包（conda-forge 没有时�
 pixi run python <script>                    # 在环境中运行脚本
 ```
 
-hw1 环境已配置完成：python、numpy、scikit-image、tqdm、opencv（conda-forge），trimesh（PyPI）。
+hw1 环境已配置完成：python、numpy、scikit-image、tqdm、opencv、tectonic（conda-forge），trimesh、matplotlib（PyPI）。
 
 ### Pixi 常用操作
 
@@ -48,6 +48,10 @@ pixi run python demo.py
 **核心文件**：
 - `fusion.py`：主要实现文件，包含 `TSDFVolume` 类和 `cam_to_world` 函数
 - `demo.py`：驱动脚本，读取 1000 帧深度图和相机位姿，调用 `fusion.py` 中的函数
+- `render_results.py`：生成报告用可视化图片
+- `report/`：报告目录，含 `report.tex`、`report.pdf`、PLY 结果和可视化图片
+
+**编译报告**：`pixi run tectonic report/report.tex`（需在 report/ 下运行或调整路径）
 
 **数据**：`data/`，包含 1000 帧的深度图（`.depth.png`，16-bit，单位毫米）、彩色图（`.color.jpg`）、相机位姿（`.pose.txt`，4×4 矩阵）和相机内参（`camera-intrinsics.txt`）。
 
@@ -56,3 +60,6 @@ pixi run python demo.py
 - Task 2：在 `TSDFVolume.__init__` 和 `integrate` 中建立体素格点坐标并投影到像素坐标采样深度
 - Task 3：在 `integrate` 中计算单帧 TSDF 值（公式：`min(1.0, (depth - z) / t)`）
 - Task 4：在 `integrate` 中加权平均融合 TSDF，在 `demo.py` 中用 Marching Cubes 抽取 mesh
+- 附加任务：带颜色的 TSDF Fusion（已完成）
+
+**hw1 状态**：所有任务已完成（Task 1-4 + 附加任务），报告在 `report/report.pdf`。

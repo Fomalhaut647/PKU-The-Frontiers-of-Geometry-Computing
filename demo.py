@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from tqdm import tqdm 
 
+import trimesh
+from skimage import measure
 import fusion
 
 
@@ -19,6 +21,8 @@ if __name__ == "__main__":
     # vol_bnds[:, 0]: minimum bounds of the voxel volume along x, y, z
     # vol_bnds[:, 1]: maximum bounds of the voxel volume along x, y, z
     vol_bnds = np.zeros((3, 2))
+    vol_bnds[:, 0] = np.inf
+    vol_bnds[:, 1] = -np.inf
     
     for i in tqdm(range(n_imgs)):
         
@@ -33,12 +37,13 @@ if __name__ == "__main__":
         cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))  
         
         #######################    Task 1    #######################
-        #  Convert depth image to world coordinates
         view_frust_pts = fusion.cam_to_world(
             depth_im, cam_intr, cam_pose,
-            export_pc=(i == 0)  # export pointcloud only for the first frame
+            export_pc=(i == 0)
         )
-        # TODO: Update voxel volume bounds `vol_bnds`
+        # Update voxel volume bounds
+        vol_bnds[:, 0] = np.minimum(vol_bnds[:, 0], view_frust_pts.min(axis=0))
+        vol_bnds[:, 1] = np.maximum(vol_bnds[:, 1], view_frust_pts.max(axis=0))
         ############################################################
 
     print("Volume bounds:", vol_bnds)
@@ -56,13 +61,38 @@ if __name__ == "__main__":
         depth_im[depth_im == 65.535] = 0
         cam_pose = np.loadtxt("data/frame-%06d.pose.txt"%(i))
 
-        # Integrate observation into voxel volume
-        tsdf_vol.integrate(depth_im, cam_intr, cam_pose, obs_weight=1.)
+        # Read color image
+        color_im = cv2.imread("data/frame-%06d.color.jpg"%(i))  # BGR
+
+        # Integrate observation into voxel volume (with color)
+        tsdf_vol.integrate(depth_im, cam_intr, cam_pose, obs_weight=1., color_im=color_im)
 
     fps = n_imgs / (time.time() - t0_elapse)
     print("Average FPS: {:.2f}".format(fps))
 
     #######################    Task 4    #######################
-    # TODO: Extract mesh from voxel volume, save and visualize it
+    # Extract mesh using Marching Cubes
+    print("Extracting mesh with Marching Cubes...")
+    verts, faces, normals, _ = measure.marching_cubes(tsdf_vol.tsdf_vol, level=0)
+    # Convert voxel indices to world coordinates
+    verts = verts * tsdf_vol.voxel_size + tsdf_vol._vol_origin
+
+    # Sample vertex colors from color volume
+    verts_idx = np.round((verts - tsdf_vol._vol_origin) / tsdf_vol.voxel_size).astype(int)
+    verts_idx = np.clip(verts_idx, 0, np.array(tsdf_vol._vol_dim) - 1)
+    vert_colors = tsdf_vol.color_vol[verts_idx[:, 0], verts_idx[:, 1], verts_idx[:, 2]]
+    # BGR -> RGB and convert to uint8
+    vert_colors = vert_colors[:, ::-1].astype(np.uint8)
+
+    # Save mesh as PLY
+    mesh = trimesh.Trimesh(vertices=verts, faces=faces, vertex_normals=normals,
+                           vertex_colors=vert_colors)
+    mesh.export("mesh.ply")
+    print("Mesh saved to mesh.ply")
+
+    # Also save a version without color
+    mesh_no_color = trimesh.Trimesh(vertices=verts, faces=faces, vertex_normals=normals)
+    mesh_no_color.export("mesh_no_color.ply")
+    print("Mesh (no color) saved to mesh_no_color.ply")
     ############################################################
 

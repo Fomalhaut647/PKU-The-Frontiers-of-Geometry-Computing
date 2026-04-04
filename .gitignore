@@ -4,6 +4,9 @@
 
 # Custom
 /*.zip
+.vscode/
 
 data/*
 !data/README.md
+
+*.ply
