@@ -1,22 +1,41 @@
-# PKU-The-Frontiers-of-Geometry-Computing
+# 几何计算前沿 第二次作业
 
-北京大学 2026 春季学期《几何计算前沿》课程的作业仓库。
+本次作业满分15分，截止日期为2026.4.22，需要实现任意一种网格处理算法，可以从第3~6课PPT中的算法任选，包括网格平滑、网格简化、参数化、网格变形等，也可以选择其他相关的算法进行实现。
 
-## 仓库约定
+#### 网格平滑
 
-- `main`：只维护项目级配置（`CLAUDE.md`、`.claude/skills/autopku/`、`pixi.lock`），不放作业交付物
-- 每次作业开一个 branch，作业 PDF / 源码 / 数值实验产物等都在对应 branch 内
-- 查看历次作业：`git branch -a` 列出所有作业 branch，`git switch <branch>` 切换查看
+如拉普拉斯平滑、顶点/法向双边滤波、稀疏优化等
 
-## 项目级工具
+数据：`smoothing.obj`
 
-`.claude/skills/autopku/` 是项目独有的 [AutoPku](https://github.com/ICUlizhi/AutoPku) skill，部署后 Claude Code 会在你提到"同步通知 / 完成作业 / 写笔记"等意图时自主触发，自动调用 `pku3b` 完成 PKU 教学网相关流程。详细工作指引见 `CLAUDE.md`。
+#### 网格简化
 
-## Python 环境
+如顶点聚类、增量式方法等
 
-某些作业需要 Python（数值优化、画图等），用 [Pixi](https://pixi.sh) 管理：
+数据：`simplification.obj`
 
-```bash
-pixi install               # 装锁定环境
-pixi run python <script>   # 跑脚本
-```
+#### 参数化
+
+如Tutte映射、共形映射、ARAP映射等，需要注意结果可视化的方式
+
+数据：`parameterization.obj`
+
+#### 网格变形
+
+如泊松变形、拉普拉斯变形、ARAP变形等
+
+数据：`deformation.obj`
+
+### 作业要求
+
+将代码、报告和结果打包在教学网提交
+
+可以选择Python或者C++实现，在报告中说明算法流程和实现过程、必要的代码编译和运行方式、展示并分析结果
+
+分数：算法完整性和正确性8分、实验结果与效果展示4分、报告3分
+
+### 说明
+
+这次作业的算法需要查找顶点的邻域。可以使用半边数据结构，也可以自己想办法不使用半边数据结构。如果需要半边数据结构，可以调用现有的库如OpenMesh：
+  - https://www.graphics.rwth-aachen.de/software/openmesh/
+  - https://pypi.org/project/openmesh/
