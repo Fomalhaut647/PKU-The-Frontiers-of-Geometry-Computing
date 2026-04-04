@@ -10,14 +10,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 环境管理
 
-使用 Pixi 管理 Python 环境。在 `pixi.toml` 中添加依赖后运行：
+使用 Pixi 管理 Python 环境。用命令行安装依赖，不要手动编辑 `pixi.toml`：
 
 ```bash
-pixi install
-pixi run python <script>
+pixi add python                             # 先装 Python（conda-forge）
+pixi add numpy scikit-image tqdm opencv     # conda-forge 包
+pixi add --pypi trimesh                     # PyPI 包（conda-forge 没有时）
+pixi run python <script>                    # 在环境中运行脚本
 ```
 
-目前 `pixi.toml` 的 `[dependencies]` 为空，需要根据作业需要添加（如 `numpy`、`opencv`、`trimesh`、`scikit-image`、`tqdm`）。
+hw1 环境已配置完成：python、numpy、scikit-image、tqdm、opencv（conda-forge），trimesh（PyPI）。
+
+### Pixi 常用操作
+
+```bash
+pixi add <pkg>            # 添加 conda 依赖
+pixi add --pypi <pkg>     # 添加 PyPI 依赖
+pixi remove <pkg>         # 移除依赖
+pixi install              # 按 lockfile 安装/同步环境
+pixi update               # 更新 lockfile 到最新兼容版本
+pixi list                 # 列出已安装包
+pixi run <cmd>            # 在环境中执行命令
+pixi shell                # 进入激活了环境的交互式 shell
+pixi task add <name> <cmd>  # 定义任务
+```
+
+> conda 包优先于 PyPI（含预编译二进制），仅在 conda-forge 没有时才用 `--pypi`。
 
 ## Homework1: TSDF Fusion
 
