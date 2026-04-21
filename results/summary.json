@@ -1,0 +1,44 @@
+{
+  "uniform_circle": {
+    "time": 0.032495975494384766,
+    "num_flipped": 0,
+    "num_degenerate": 0,
+    "conformal_mean": 11.235374868699349,
+    "conformal_p95": 30.9224322127103,
+    "area_ratio_p05": 0.01826330009649066,
+    "area_ratio_p95": 4.3275306051397
+  },
+  "uniform_square": {
+    "time": 0.027053117752075195,
+    "num_flipped": 0,
+    "num_degenerate": 67,
+    "conformal_mean": 69.51925620204798,
+    "conformal_p95": 98.5169199472959,
+    "area_ratio_p05": 0.008504947534979813,
+    "area_ratio_p95": 4.474354670019555
+  },
+  "cotangent_circle": {
+    "time": 0.03814959526062012,
+    "num_flipped": 0,
+    "num_degenerate": 0,
+    "conformal_mean": 11.443037040310102,
+    "conformal_p95": 33.33644725049587,
+    "area_ratio_p05": 0.015733538265895734,
+    "area_ratio_p95": 2.7405079391494644
+  },
+  "cotangent_square": {
+    "time": 0.04055047035217285,
+    "num_flipped": 0,
+    "num_degenerate": 67,
+    "conformal_mean": 145.03413731108054,
+    "conformal_p95": 400.1698665622541,
+    "area_ratio_p05": 0.003112672592628413,
+    "area_ratio_p95": 3.072363308867022
+  },
+  "mesh": {
+    "n_vertices": 3195,
+    "n_faces": 5804,
+    "n_boundary": 584,
+    "euler_number": 1
+  }
+}

@@ -8,3 +8,15 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
+python = "3.12.*"
+numpy = ">=2.4.3,<3"
+scipy = ">=1.17.1,<2"
+trimesh = ">=4.11.5,<5"
+matplotlib = ">=3.10.8,<4"
+pillow = ">=12.2.0,<13"
+openmesh-python = ">=1.2.1,<2"
+pandoc = ">=3.9.0.2,<4"
+texlive-core = ">=20230313,<20230314"
+font-ttf-noto-cjk = ">=2.4,<3"
+weasyprint = ">=67.0,<68"
+poppler = ">=26.2.0,<27"
