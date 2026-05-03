@@ -8,3 +8,15 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
+python = "3.11.*"
+
+[pypi-dependencies]
+torch = ">=2.11.0, <3"
+torchvision = ">=0.26.0, <0.27"
+numpy = ">=2.4.4, <3"
+h5py = ">=3.16.0, <4"
+matplotlib = ">=3.10.9, <4"
+tqdm = ">=4.67.3, <5"
+scikit-learn = ">=1.8.0, <2"
+tensorboard = ">=2.20.0, <3"
+trimesh = ">=4.12.2, <5"

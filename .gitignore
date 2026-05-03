@@ -1,6 +1,26 @@
-# pixi environments
-.pixi/*
-!.pixi/config.toml
+# 原始数据集 / 缓存（大文件）
+ModelNet40/
+data/
+*.zip
+*.npz
 
-# Custom
-/*.zip
+# Pixi 环境
+.pixi/
+
+# 训练产物（大文件，由训练流程产生；交付时打包到提交压缩包）
+checkpoints/
+
+# LaTeX 编译临时
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.synctex.gz
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 提交压缩包（运行时产生，不入 git）
+*.tar.gz
+hw3_submit*.zip
