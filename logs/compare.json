@@ -1,0 +1,22 @@
+[
+  {
+    "model": "pointnet",
+    "in_channels": 3,
+    "use_normals": false,
+    "params_M": 3.471473,
+    "params_raw": 3471473,
+    "sec_per_batch": 0.0013347244262695312,
+    "sec_per_sample": 0.0001668405532836914,
+    "samples_per_sec": 5993.746606076195
+  },
+  {
+    "model": "pointnet2",
+    "in_channels": 6,
+    "use_normals": true,
+    "params_M": 1.47588,
+    "params_raw": 1475880,
+    "sec_per_batch": 0.03258763313293457,
+    "sec_per_sample": 0.004073454141616821,
+    "samples_per_sec": 245.49190078842608
+  }
+]
