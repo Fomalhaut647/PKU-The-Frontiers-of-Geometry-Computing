@@ -3,5 +3,19 @@
 !.pixi/config.toml
 
 # Custom
-/*.zip
+*.zip
 /data/
+
+# 模型权重（按作业要求不提交）
+results/*/model_*.pt
+
+# LaTeX 编译中间文件
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.fls
+report/*.fdb_latexmk
+
+__pycache__/
+*.pyc

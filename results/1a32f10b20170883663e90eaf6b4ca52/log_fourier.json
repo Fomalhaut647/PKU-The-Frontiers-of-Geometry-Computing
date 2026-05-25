@@ -1,0 +1,75 @@
+{
+  "uid": "1a32f10b20170883663e90eaf6b4ca52",
+  "variant": "fourier",
+  "num_params": 723201,
+  "num_epochs": 2000,
+  "batch_size": 16384,
+  "lr": 0.001,
+  "lambda": 0.1,
+  "train_time_s": 37.49,
+  "loss_curve": [
+    {
+      "epoch": 200,
+      "loss": 0.019908,
+      "loss_sdf": 0.015892,
+      "loss_grad": 0.04016
+    },
+    {
+      "epoch": 400,
+      "loss": 0.019846,
+      "loss_sdf": 0.016436,
+      "loss_grad": 0.034101
+    },
+    {
+      "epoch": 600,
+      "loss": 0.018206,
+      "loss_sdf": 0.014777,
+      "loss_grad": 0.034284
+    },
+    {
+      "epoch": 800,
+      "loss": 0.017825,
+      "loss_sdf": 0.013924,
+      "loss_grad": 0.039012
+    },
+    {
+      "epoch": 1000,
+      "loss": 0.016499,
+      "loss_sdf": 0.01255,
+      "loss_grad": 0.039497
+    },
+    {
+      "epoch": 1200,
+      "loss": 0.016442,
+      "loss_sdf": 0.012143,
+      "loss_grad": 0.042984
+    },
+    {
+      "epoch": 1400,
+      "loss": 0.015854,
+      "loss_sdf": 0.011395,
+      "loss_grad": 0.044585
+    },
+    {
+      "epoch": 1600,
+      "loss": 0.015541,
+      "loss_sdf": 0.011178,
+      "loss_grad": 0.04363
+    },
+    {
+      "epoch": 1800,
+      "loss": 0.01588,
+      "loss_sdf": 0.011536,
+      "loss_grad": 0.043445
+    },
+    {
+      "epoch": 2000,
+      "loss": 0.01536,
+      "loss_sdf": 0.010889,
+      "loss_grad": 0.044708
+    }
+  ],
+  "recon_time_s": 0.17,
+  "mesh_verts": 1476,
+  "mesh_faces": 2948
+}

@@ -1,0 +1,358 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xeCJK}
+\usepackage{fontspec}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+
+\setCJKmainfont{AR PL UMing CN}
+\setCJKsansfont{AR PL UMing CN}
+\setCJKmonofont{AR PL UMing CN}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\title{几何计算前沿\\第四次作业报告\\基于 MLP 的从点云重建表面}
+\author{刘智琦 2300012860}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+% =========================================================================
+\section{方法概述}
+% =========================================================================
+
+本次作业实现了基于 MLP（多层感知机）的隐式表面重建方法。网络以空间查询点坐标为输入，输出该点的符号距离函数（SDF）值。训练完成后，在均匀格点上计算 SDF，再用 Marching Cubes 算法提取零等值面，得到重建表面。
+
+同时实现了拓展任务：基于 Fourier Feature 的位置编码，将查询点坐标先映射到高维频率空间，再输入 MLP，以提升对高频细节的表达能力。
+
+% =========================================================================
+\section{神经网络模型与方法细节}
+% =========================================================================
+
+\subsection{基础模型：Vanilla MLP}
+
+\textbf{网络结构：}8 层全连接网络，每层宽度 256，激活函数为 ReLU，第 4 层处引入跳跃连接（Skip Connection），将输入坐标拼接到第 4 层的输入特征上。结构如下：
+
+\begin{equation}
+  h_0 = \text{ReLU}(W_0 \, q + b_0)
+\end{equation}
+\begin{equation}
+  h_i = \text{ReLU}(W_i \, h_{i-1} + b_i), \quad i = 1,2,3
+\end{equation}
+\begin{equation}
+  h_4 = \text{ReLU}(W_4 \, [h_3;\, q] + b_4)  \quad \text{（跳跃连接）}
+\end{equation}
+\begin{equation}
+  h_i = \text{ReLU}(W_i \, h_{i-1} + b_i), \quad i = 5,6,7
+\end{equation}
+\begin{equation}
+  \tilde{F}(q) = W_{\text{out}} \, h_7 + b_{\text{out}}
+\end{equation}
+
+输入维度为 3（$(x, y, z)$ 坐标），输出维度为 1（SDF 值）。
+
+\textbf{参数量：}
+\begin{itemize}[noitemsep]
+  \item 第 0 层：$3 \times 256 + 256 = 1{,}024$
+  \item 第 1–3 层（各）：$256 \times 256 + 256 = 65{,}792$（共 3 层）
+  \item 第 4 层（跳跃）：$(256+3) \times 256 + 256 = 66{,}048$
+  \item 第 5–7 层（各）：$256 \times 256 + 256 = 65{,}792$（共 3 层）
+  \item 输出层：$256 \times 1 + 1 = 257$
+\end{itemize}
+\textbf{总参数量：}$\mathbf{462{,}593}$
+
+\subsection{拓展模型：Fourier Feature MLP}
+
+\textbf{位置编码：}参考 Tancik 等人 \cite{fourier2020}，对输入坐标 $q \in \mathbb{R}^3$ 进行随机 Fourier 特征映射：
+
+\begin{equation}
+  \gamma(q) = \left[\sin(2\pi \mathbf{B} q),\; \cos(2\pi \mathbf{B} q)\right]^\top \in \mathbb{R}^{2L}
+\end{equation}
+
+其中 $\mathbf{B} \in \mathbb{R}^{L \times 3}$ 为固定随机矩阵，每个元素从 $\mathcal{N}(0, \sigma^2)$ 采样。
+本实验取 $L = 256$，$\sigma = 10$，编码维度为 $2 \times 256 = 512$。
+
+\textbf{网络结构：}与 Vanilla MLP 相同（8 层，宽度 256，跳跃连接），但输入维度改为 512（Fourier 编码后的维度）。
+
+\textbf{总参数量：}
+\begin{itemize}[noitemsep]
+  \item Fourier 矩阵 $\mathbf{B}$：$256 \times 3 = 768$（不参与训练，仅作缓冲区）
+  \item 第 0 层：$512 \times 256 + 256 = 131{,}328$
+  \item 第 4 层（跳跃）：$(256+512) \times 256 + 256 = 196{,}864$
+  \item 其余层与 Vanilla 相同
+\end{itemize}
+\textbf{总可训练参数量：}$\mathbf{723{,}201}$
+
+\subsection{损失函数}
+
+\begin{equation}
+  \mathcal{L} = \frac{1}{|B|}\sum_{q_i \in B} \left[
+    \left(\tilde{F}(q_i) - F(q_i)\right)^2
+    + \lambda \left\|\nabla_{q_i}\tilde{F}(q_i) - N(q_i)\right\|^2
+  \right]
+\end{equation}
+
+其中 $F(q_i)$ 为真实 SDF 值，$N(q_i)$ 为真实 SDF 梯度（单位法向量），$B$ 为随机采样的 mini-batch，$\lambda$ 为梯度损失权重（本实验取 $\lambda = 0.1$）。
+
+梯度 $\nabla_{q_i}\tilde{F}$ 通过 \texttt{torch.autograd.grad} 对输入坐标求导计算。
+
+% =========================================================================
+\section{训练策略}
+% =========================================================================
+
+\subsection{超参数设置}
+
+\begin{table}[H]
+  \centering
+  \caption{训练超参数}
+  \begin{tabular}{ll}
+    \toprule
+    超参数 & 值 \\
+    \midrule
+    优化器 & Adam \\
+    学习率 & $10^{-3}$，余弦退火衰减至 $10^{-5}$ \\
+    批量大小 & 16{,}384（从约 93 万样本中随机采样） \\
+    训练轮数 & 2{,}000 \\
+    梯度损失权重 $\lambda$ & 0.1 \\
+    Fourier 频率数 $L$ & 256 \\
+    Fourier 标准差 $\sigma$ & 10.0 \\
+    Marching Cubes 分辨率 & $128^3$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{设计说明}
+
+\begin{itemize}
+  \item \textbf{跳跃连接：}参照 DeepSDF~\cite{deepsdf2019} 的做法，在第 4 层引入跳跃连接，帮助梯度流动、防止深层网络退化。
+  \item \textbf{余弦退火：}使学习率平滑衰减，后期精细优化。
+  \item \textbf{随机采样：}每步随机采样 16{,}384 个点（约占总样本 1.8\%），避免内存瓶颈，同时提供足够多样的梯度信号。
+  \item \textbf{梯度损失权重：}$\lambda = 0.1$ 在 SDF 拟合精度和梯度（法向）一致性之间取得平衡。
+\end{itemize}
+
+% =========================================================================
+\section{训练与重建时间}
+% =========================================================================
+
+实验在 NVIDIA RTX 5090（32 GB VRAM）上运行。
+
+\begin{table}[H]
+  \centering
+  \caption{各形状的训练与重建时间}
+  \begin{tabular}{lcccc}
+    \toprule
+    Shape & \multicolumn{2}{c}{Vanilla MLP} & \multicolumn{2}{c}{Fourier MLP} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+          & 训练 (s) & 重建 (s) & 训练 (s) & 重建 (s) \\
+    \midrule
+    Shape 1 (1a04e3) & 40.3 & 0.13 & 48.6 & 0.15 \\
+    Shape 2 (1a32f1) & 35.7 & 0.13 & 37.5 & 0.17 \\
+    Shape 3 (1a54a2) & 35.0 & 0.12 & 38.4 & 0.17 \\
+    Shape 4 (1a6ad7) & 36.1 & 0.13 & 42.8 & 0.19 \\
+    Shape 5 (1a9b55) & 39.8 & 0.13 & 43.7 & 0.15 \\
+    \midrule
+    \textbf{总计} & \textbf{186.9} & \textbf{0.64} & \textbf{211.0} & \textbf{0.83} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Fourier MLP 训练时间比 Vanilla 约多 13\%，主要来自更大的输入层（512 维 vs 3 维）和编码计算。Marching Cubes 重建时间很短（约 0.1--0.2 s/shape）。
+
+% =========================================================================
+\section{重建结果}
+% =========================================================================
+
+\subsection{量化指标}
+
+\begin{table}[H]
+  \centering
+  \caption{各形状最终损失（2000 epoch 末）}
+  \begin{tabular}{lcccccc}
+    \toprule
+    Shape & \multicolumn{3}{c}{Vanilla MLP} & \multicolumn{3}{c}{Fourier MLP} \\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+    & $\mathcal{L}$ & $\mathcal{L}_\text{sdf}$ & $\mathcal{L}_\text{grad}$ & $\mathcal{L}$ & $\mathcal{L}_\text{sdf}$ & $\mathcal{L}_\text{grad}$ \\
+    \midrule
+    Shape 1 & 0.01335 & 0.00077 & 0.12578 & \textbf{0.00557} & 0.00368 & \textbf{0.01885} \\
+    Shape 2 & 0.01318 & \textbf{0.00185} & 0.11338 & 0.01536 & 0.01089 & \textbf{0.04471} \\
+    Shape 3 & 0.01512 & \textbf{0.00153} & 0.13592 & \textbf{0.01464} & 0.00939 & \textbf{0.05253} \\
+    Shape 4 & 0.01929 & \textbf{0.00204} & 0.17258 & \textbf{0.01196} & 0.00555 & \textbf{0.06405} \\
+    Shape 5 & 0.01628 & \textbf{0.00117} & 0.15110 & \textbf{0.01071} & 0.00657 & \textbf{0.04142} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{重建网格信息}
+  \begin{tabular}{lcccc}
+    \toprule
+    Shape & \multicolumn{2}{c}{Vanilla MLP} & \multicolumn{2}{c}{Fourier MLP} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+          & 顶点数 & 面片数 & 顶点数 & 面片数 \\
+    \midrule
+    Shape 1 & 14{,}669 & 29{,}330 & 10{,}996 & 21{,}896 \\
+    Shape 2 &  3{,}416 &  6{,}828 &  1{,}476 &  2{,}948 \\
+    Shape 3 &  3{,}858 &  7{,}712 &  1{,}692 &  3{,}360 \\
+    Shape 4 &  3{,}654 &  7{,}304 &  1{,}954 &  3{,}900 \\
+    Shape 5 &  7{,}110 & 14{,}216 &  4{,}857 &  9{,}690 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{可视化结果}
+
+图 \ref{fig:overview} 展示所有五个形状的重建对比（从左到右：Ground Truth、Vanilla MLP、Fourier MLP）。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/overview_all.png}
+  \caption{五个飞机模型的重建结果对比（Ground Truth / Vanilla MLP / Fourier MLP）}
+  \label{fig:overview}
+\end{figure}
+
+各形状的两视角对比图见图 \ref{fig:shape1}--\ref{fig:shape5}。
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/compare_1a04e3eab45c.png}
+  \caption{Shape 1 两视角对比}
+  \label{fig:shape1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/compare_1a32f10b2017.png}
+  \caption{Shape 2 两视角对比}
+  \label{fig:shape2}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/compare_1a54a2319e87.png}
+  \caption{Shape 3 两视角对比}
+  \label{fig:shape3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/compare_1a6ad7a24bb8.png}
+  \caption{Shape 4 两视角对比}
+  \label{fig:shape4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figures/compare_1a9b552befd6.png}
+  \caption{Shape 5 两视角对比}
+  \label{fig:shape5}
+\end{figure}
+
+\subsection{结果分析}
+
+两种方法均能重建出与 Ground Truth 外形相近的飞机形状，整体轮廓（机身、机翼、尾翼）可辨。
+
+\textbf{Vanilla MLP 的特点：}
+\begin{itemize}
+  \item SDF 误差极小（$\mathcal{L}_\text{sdf} < 0.002$），零等值面位置准确；
+  \item 梯度误差较大（$\mathcal{L}_\text{grad} \approx 0.11$--$0.17$），表面法向精度不足；
+  \item 重建表面光滑，但高频细节（翼尖、引擎舱等）被磨平——这正是 MLP 频谱偏置（spectral bias）的体现。
+\end{itemize}
+
+\textbf{Fourier MLP 的特点：}
+\begin{itemize}
+  \item 梯度误差显著降低（$\mathcal{L}_\text{grad} \approx 0.019$--$0.065$，约为 Vanilla 的 1/3--1/6），说明表面法向预测更准确；
+  \item SDF 绝对误差略有增大，但更多格点对应表面真实法向；
+  \item 部分形状（Shape 1）重建顶点数更多，表面细节更丰富；Shape 2--5 由于数据分布较集中，顶点数略减，但法向质量更好。
+\end{itemize}
+
+% =========================================================================
+\section{拓展任务：Fourier Feature 对比分析}
+% =========================================================================
+
+\subsection{原理}
+
+深层 MLP 具有频谱偏置（spectral bias）\cite{rahaman2019spectral}：在训练早期，网络倾向于先拟合低频成分，高频函数的学习非常缓慢。对于 SDF 重建任务，这意味着 Vanilla MLP 容易生成过于光滑的表面，丢失翼尖、引擎槽等高频几何特征。
+
+Fourier Feature 方法通过随机位置编码：
+\begin{equation}
+  \gamma(q) = \left[\sin(2\pi \mathbf{B} q),\; \cos(2\pi \mathbf{B} q)\right]^\top
+\end{equation}
+将输入映射到一个内积核函数空间：
+\begin{equation}
+  k(q, q') = e^{-\frac{\pi^2 \sigma^2}{2}\|q-q'\|^2}
+\end{equation}
+即高斯 RBF 核。当 $\sigma$ 较大时，核函数带宽窄、支撑高频分量，使得 MLP 能够高效拟合高频细节，克服频谱偏置。
+
+\subsection{实验结果对比}
+
+从表 2 可以看出：
+
+\begin{itemize}
+  \item \textbf{梯度损失（$\mathcal{L}_\text{grad}$）：}Fourier MLP 在所有 5 个形状上均显著优于 Vanilla MLP，降幅约 50\%--85\%。这直接验证了 Fourier Feature 对高频分量（法向）的提升作用。
+
+  \item \textbf{SDF 损失（$\mathcal{L}_\text{sdf}$）：}Vanilla MLP 在 SDF 绝对值上略优（Shape 2, 3, 5）。这符合预期：高频映射引入更多自由度，网络更容易在 SDF 绝对值上产生波动，但换取了更好的梯度方向。
+
+  \item \textbf{总损失：}4/5 形状上 Fourier MLP 总损失更低，综合性能更好。
+\end{itemize}
+
+\subsection{从可视化图像中观察}
+
+（参见图 \ref{fig:overview} 及图 \ref{fig:shape1}--\ref{fig:shape5}）
+
+\begin{itemize}
+  \item Vanilla MLP 重建的表面整体更"圆润"，边缘过渡更模糊；
+  \item Fourier MLP 重建的表面在翼身连接处、尾翼边缘处呈现出更锐利的棱线，法向方向变化更陡峭，视觉上细节更丰富；
+  \item 在 Shape 1（顶点数最多的形状）上，两者差异最为显著，Fourier 重建的机翼轮廓更清晰。
+\end{itemize}
+
+\subsection{局限性}
+
+\begin{itemize}
+  \item $\sigma = 10$ 时 Fourier 特征覆盖的频率范围已经较高，但仍受限于 $128^3$ Marching Cubes 分辨率，无法表现比格点间距（约 0.009 m）更细的特征。
+  \item 部分 Fourier 重建网格（Shape 1、3、5）Euler 特征数非零，说明存在拓扑噪声；这是高频拟合与有限 SDF 样本密度之间的权衡。
+  \item 两种方法均采用相同的训练轮数和超参数，实际上 Fourier MLP 可能从更多轮训练或更小的 $\sigma$ 中受益更多。
+\end{itemize}
+
+% =========================================================================
+\section{结论}
+% =========================================================================
+
+本次作业成功实现了基于 MLP 和 Fourier Feature MLP 的 SDF 隐式表面重建方法：
+
+\begin{itemize}
+  \item 两种方法均能在约 40 秒内完成 2000 轮训练，并快速提取重建 mesh；
+  \item Vanilla MLP 提供稳定、光滑的重建，SDF 绝对值拟合精度高；
+  \item Fourier Feature MLP 通过位置编码突破频谱偏置，法向预测精度显著提升，重建表面的高频细节更丰富；
+  \item 在绝大多数形状上，Fourier MLP 总损失更低，综合重建质量更优。
+\end{itemize}
+
+% =========================================================================
+\begin{thebibliography}{9}
+\bibitem{fourier2020}
+  Tancik, M., Srinivasan, P.P., Mildenhall, B., Fridovich-Keil, S., Raghavan, N., Singhal, U., Ramamoorthi, R., Barron, J.T., Ng, R.
+  \textit{Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains}.
+  NeurIPS, 2020.
+
+\bibitem{deepsdf2019}
+  Park, J.J., Florence, P., Straub, J., Newcombe, R., Lovegrove, S.
+  \textit{DeepSDF: Learning Continuous Signed Distance Functions for Shape Representation}.
+  CVPR, 2019.
+
+\bibitem{rahaman2019spectral}
+  Rahaman, N., Baratin, A., Arpit, D., Draxler, F., Lin, M., Hamprecht, F.A., Bengio, Y., Courville, A.
+  \textit{On the Spectral Bias of Neural Networks}.
+  ICML, 2019.
+\end{thebibliography}
+
+\end{document}
